@@ -84,4 +84,4 @@ $(TARGET).so: $(TARGET).o $(OBJS)
 # clean rule
 .PHONY: clean
 clean:
-	rm -f *.o *.efi *.efi.debug
+	rm -f *.o *.so *.efi *.efi.debug
