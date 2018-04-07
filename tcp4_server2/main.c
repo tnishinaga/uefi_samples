@@ -80,6 +80,61 @@ open_tcp4_protocol(
     return efi_status;
 }
 
+EFI_STATUS
+configure_tcp4_address(
+    IN EFI_TCP4 *tcp4_protocol
+)
+{
+    EFI_STATUS efi_status;
+    // configure
+    EFI_TCP4_ACCESS_POINT ap = {
+        .StationAddress.Addr = {192,168,20,20},
+        .SubnetMask.Addr = {255,255,255,0},
+        .StationPort = (UINT16)10000,
+        .RemoteAddress.Addr = {192,168,20,1},
+        .RemotePort = (UINT16)10010,
+        .ActiveFlag = FALSE /* set FALSE when server */
+    };
+    EFI_TCP4_CONFIG_DATA conf = {
+        .TypeOfService = 0, /* ToS */
+        .TimeToLive = 100,
+        .AccessPoint = ap,
+        .ControlOption = NULL
+    };
+    efi_status = uefi_call_wrapper(
+        tcp4_protocol->Configure,
+        2,
+        tcp4_protocol,
+        &conf
+    );
+
+    return efi_status;
+}
+
+EFI_STATUS
+set_tcp4_route(
+    IN EFI_TCP4 *tcp4_protocol
+)
+{
+    EFI_STATUS efi_status;
+
+    // set route
+    EFI_IPv4_ADDRESS subaddr = {.Addr = {192,168,20,0}};
+    EFI_IPv4_ADDRESS submask = {.Addr = {255,255,255,0}};
+    EFI_IPv4_ADDRESS gateway = {.Addr = {192,168,20,1}};
+    efi_status = uefi_call_wrapper(
+        tcp4_protocol->Routes,
+        5,
+        tcp4_protocol,
+        FALSE,
+        &subaddr,
+        &submask,
+        &gateway
+    );
+
+    return efi_status;
+}
+
 
 static inline EFI_STATUS
 CreateTcp4NotifyEvent(
@@ -426,14 +481,14 @@ tcp4_close(MY_EFI_SOCKET *sock)
     return EFI_SUCCESS;
 }
 
-
 EFI_STATUS
-efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
+retrieve_tcp4_protocol(
+    IN OUT EFI_HANDLE *tcp4_handler,
+    OUT EFI_SERVICE_BINDING **tcp4_service_binding_protocol,
+    OUT EFI_TCP4 **tcp4_protocol
+)
 {
     EFI_STATUS efi_status;
-
-    InitializeLib(image_handle, systab);
-
     // load handlers
     EFI_HANDLE *tcp4_service_binding_handlers = NULL;
     UINTN tcp4_service_binding_nohandlers;
@@ -447,68 +502,51 @@ efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
     }
 
     // load protocol from handler
-    EFI_SERVICE_BINDING *tcp4_service_binding_protocol = NULL;
     efi_status = load_tcp4_service_binding_protocol(
-        &tcp4_service_binding_protocol, tcp4_service_binding_handlers[0]
+        tcp4_service_binding_protocol, tcp4_service_binding_handlers[0] /* select handler 0 */
     );
     MY_EFI_ASSERT(efi_status, __LINE__);
 
     // Create Child
-    EFI_HANDLE tcp4_handler;
     efi_status = uefi_call_wrapper(
-        tcp4_service_binding_protocol->CreateChild,
+        (*tcp4_service_binding_protocol)->CreateChild,
         2,
-        tcp4_service_binding_protocol,
-        &tcp4_handler
+        *tcp4_service_binding_protocol,
+        tcp4_handler
     );
     MY_EFI_ASSERT(efi_status, __LINE__);
 
-    EFI_TCP4 *tcp4_protocol = NULL;
-    efi_status = open_tcp4_protocol(&tcp4_protocol, tcp4_handler);
+    efi_status = open_tcp4_protocol(tcp4_protocol, *tcp4_handler);
     MY_EFI_ASSERT(efi_status, __LINE__);
     if (tcp4_protocol == NULL) {
         Print(L"Error: failed to load TCP4 protocol!\n");
         return EFI_ABORTED;
     }
 
-    // configure
-    EFI_TCP4_ACCESS_POINT ap = {
-        .StationAddress.Addr = {192,168,20,20},
-        .SubnetMask.Addr = {255,255,255,0},
-        .StationPort = (UINT16)10000,
-        .RemoteAddress.Addr = {192,168,20,1},
-        .RemotePort = (UINT16)10010,
-        .ActiveFlag = FALSE /* set FALSE when server */
-    };
-    EFI_TCP4_CONFIG_DATA conf = {
-        .TypeOfService = 0, /* ToS */
-        .TimeToLive = 100,
-        .AccessPoint = ap,
-        .ControlOption = NULL
-    };
-    efi_status = uefi_call_wrapper(
-        tcp4_protocol->Configure,
-        2,
-        tcp4_protocol,
-        &conf
-    );
+    return EFI_SUCCESS;
+}
+
+
+EFI_STATUS
+efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
+{
+    EFI_STATUS efi_status;
+
+    InitializeLib(image_handle, systab);
+
+    EFI_SERVICE_BINDING *tcp4_service_binding_protocol;
+    EFI_TCP4 *tcp4_protocol;
+    EFI_HANDLE tcp4_handler;
+
+    efi_status = retrieve_tcp4_protocol(&tcp4_handler, &tcp4_service_binding_protocol, &tcp4_protocol);
     MY_EFI_ASSERT(efi_status, __LINE__);
 
-    // set route
-    EFI_IPv4_ADDRESS subaddr = {.Addr = {192,168,20,0}};
-    EFI_IPv4_ADDRESS submask = {.Addr = {255,255,255,0}};
-    EFI_IPv4_ADDRESS gateway = {.Addr = {192,168,20,1}};
-    efi_status = uefi_call_wrapper(
-        tcp4_protocol->Routes,
-        5,
-        tcp4_protocol,
-        FALSE,
-        &subaddr,
-        &submask,
-        &gateway
-    );
+    efi_status = configure_tcp4_address(tcp4_protocol);
     MY_EFI_ASSERT(efi_status, __LINE__);
 
+    // route infomation is optional
+    efi_status = set_tcp4_route(tcp4_protocol);
+    MY_EFI_ASSERT(efi_status, __LINE__);
 
     Print(L"Waiting accept...\n");
     MY_EFI_SOCKET *sock = tcp4_accept(tcp4_protocol);
@@ -526,6 +564,10 @@ efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
     // check TCP4 state
     volatile EFI_TCP4_CONNECTION_STATE state;
     while (sock->token.close != NULL) {
+        // なぜこの処理が必要なのか : 
+        // UEFIアプリ側とPython script側の両方でCloseを呼ぶと
+        // UEFIアプリ側のCloseNotifyが発火しない場合があり、
+        // 無限ループとなることを防ぐため。
         // check status
         efi_status = uefi_call_wrapper(
             sock->protocol->GetModeData,
