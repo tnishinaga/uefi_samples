@@ -40,7 +40,7 @@ LDFLAGS+=-L$(PREFIX)/lib
 
 ####### rules #########
 
-all: $(TARGET).efi $(TARGET).efi.debug
+all: $(TARGET).efi 
 
 # rebuild shared object to PE binary
 $(TARGET).efi: $(TARGET).so
@@ -59,18 +59,6 @@ $(TARGET).efi: $(TARGET).so
 				-O binary \
 				$(TARGET).so $@
 
-# Extract debug symboles
-$(TARGET).efi.debug: $(TARGET).so
-	$(OBJCOPY)	-j .debug_info		\
-				-j .debug_abbrev	\
-				-j .debug_aranges	\
-				-j .debug_line		\
-				-j .debug_str		\
-				-j .debug_ranges	\
-				-j .note.gnu.build-id \
-				-O binary \
-				$(TARGET).so $@
-
 # build shared object
 $(TARGET).so: $(TARGET).o $(OBJS)
 	$(LD) $(LDFLAGS) $(STARTOBJ) $^ -o $@	\
@@ -84,4 +72,4 @@ $(TARGET).so: $(TARGET).o $(OBJS)
 # clean rule
 .PHONY: clean
 clean:
-	rm -f *.o *.so *.efi *.efi.debug
+	rm -f *.o *.so *.efi 
