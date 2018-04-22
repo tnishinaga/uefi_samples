@@ -54,3 +54,6 @@ dkms.conf
 # UEFI
 *.efi
 *.efi.debug
+
+# emacs temp
+*~
