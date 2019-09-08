@@ -66,6 +66,17 @@ $(TARGET).so: $(TARGET).o $(OBJS)
 		-T $(LDSCRIPT)
 
 
+qemu: $(TARGET).efi
+	qemu-system-aarch64 \
+		-M virt \
+		-cpu cortex-a57 \
+		-m 512 \
+		-bios /usr/share/qemu-efi-aarch64/QEMU_EFI.fd \
+		-nographic \
+		-hda fat:rw:./ \
+		-s
+
+
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 

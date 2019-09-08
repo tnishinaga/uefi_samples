@@ -1,5 +1,5 @@
-CROSS_COMPILE=aarch64-elf-
-PREFIX=/usr/aarch64-elf/
+CROSS_COMPILE=aarch64-linux-gnu-
+PREFIX=/usr/aarch64-linux-gnu/
 ARCH=aarch64
 TARGET=main
 OBJS=
