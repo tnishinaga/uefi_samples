@@ -237,7 +237,7 @@ efi_main (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     Print(L"Show entry point\n");
     EFI_LOADED_IMAGE *NextLoadedImage = OpenLoadedImageProtocol(NextImage);
-    Print(L"entry: 0x016%lx\n", NextLoadedImage->ImageBase);
+    Print(L"entry: 0x%016lx\n", NextLoadedImage->ImageBase);
     WaitDebuggerAArch64(NextLoadedImage->ImageBase);
 
 
