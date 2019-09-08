@@ -1,0 +1,7 @@
+version: '3'
+services:
+  aarch64-uefi-toolchain:
+    build: .
+    container_name: aarch64-uefi-toolchain
+    volumes:
+      - .:/root/work:rw
