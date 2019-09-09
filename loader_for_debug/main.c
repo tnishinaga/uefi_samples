@@ -105,7 +105,7 @@ ConvertDevicePathToText(EFI_DEVICE_PATH_PROTOCOL *DevicePath)
 }
 
 EFI_LOADED_IMAGE *
-OpenLoadedImageProtocol(EFI_HANDLE ImageHandle)
+OpenLoadedImageProtocol(EFI_HANDLE Handle, EFI_HANDLE AgentHandle)
 {
     static EFI_LOADED_IMAGE *LoadedImage = NULL;
     if (LoadedImage == NULL) {
@@ -113,10 +113,10 @@ OpenLoadedImageProtocol(EFI_HANDLE ImageHandle)
             uefi_call_wrapper(
                 BS->OpenProtocol,
                 6,
-                ImageHandle, /* Handle */
+                Handle, /* Handle */
                 &LoadedImageProtocol, /* Protocol */
                 (VOID **)&LoadedImage, /* Interface */
-                ImageHandle, /* AgentHandle */
+                AgentHandle, /* AgentHandle */
                 NULL, /* ControllrHandle */
                 EFI_OPEN_PROTOCOL_GET_PROTOCOL /* Attributes */
             )
@@ -126,9 +126,9 @@ OpenLoadedImageProtocol(EFI_HANDLE ImageHandle)
 }
 
 EFI_DEVICE_PATH_PROTOCOL *
-GetDevicePathOfThisImage(EFI_HANDLE ImageHandle)
+GetDevicePathOfThisImage(EFI_HANDLE Handle, EFI_HANDLE AgentHandle)
 {
-    EFI_LOADED_IMAGE *LoadedImage = OpenLoadedImageProtocol(ImageHandle);
+    EFI_LOADED_IMAGE *LoadedImage = OpenLoadedImageProtocol(Handle, AgentHandle);
 
     EFI_DEVICE_PATH_PROTOCOL *DevicePath = NULL;
     MY_EFI_ASSERT(
@@ -138,7 +138,7 @@ GetDevicePathOfThisImage(EFI_HANDLE ImageHandle)
             LoadedImage->DeviceHandle, /* Handle */
             &DevicePathProtocol, /* Protocol */
             (VOID **)&DevicePath, /* Interface */
-            ImageHandle, /* AgentHandle */
+            AgentHandle, /* AgentHandle */
             NULL, /* ControllrHandle */
             EFI_OPEN_PROTOCOL_GET_PROTOCOL /* Attributes */
         )
@@ -198,7 +198,7 @@ efi_main (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     
     // gnu-efi cannot use EFI_DEVICE_PATH_UTILITIES_PROTOCOL
     // So I use FileDevicePath that is provided from gnu-efi
-    EFI_LOADED_IMAGE *LoadedImage = OpenLoadedImageProtocol(ImageHandle);
+    EFI_LOADED_IMAGE *LoadedImage = OpenLoadedImageProtocol(ImageHandle, ImageHandle);
     EFI_DEVICE_PATH_PROTOCOL *NextDevicePath = 
         FileDevicePath(LoadedImage->DeviceHandle, APP_PATH);
     Print(L"Path: %s\n", ConvertDevicePathToText(NextDevicePath));
@@ -236,8 +236,9 @@ efi_main (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     Print(L"Finish LoadImage\n");
 
     Print(L"Show entry point\n");
-    EFI_LOADED_IMAGE *NextLoadedImage = OpenLoadedImageProtocol(NextImage);
-    Print(L"entry: 0x%016lx\n", NextLoadedImage->ImageBase);
+    EFI_LOADED_IMAGE *NextLoadedImage = OpenLoadedImageProtocol(NextImage, ImageHandle);
+    Print(L"current entry: 0x%016lx\n", LoadedImage->ImageBase);
+    Print(L"next entry: 0x%016lx\n", NextLoadedImage->ImageBase);
     WaitDebuggerAArch64(NextLoadedImage->ImageBase);
 
 
